@@ -1,30 +1,48 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
-#include <vector>
-#include <sstream>
 #include <functional>
+#include <stdlib.h>
+#include <nlohmann/json.hpp>
+#include <mongocxx/client.hpp>
+#include <mongocxx/instance.hpp>
 
-void runCommand(const std::vector<std::string>& parameters) {
-    std::cout << "You commanded me to run." << std::endl;
-    // Access and use the parameters as needed
-}
+using json = nlohmann::json;
 
-void walkCommand(const std::vector<std::string>& parameters) {
-    std::cout << "You commanded me to walk." << std::endl;
-    // Access and use the parameters as needed
-}
+void executeCommand(const std::vector<std::string>& parameters) {
+    std::string commandName = parameters[0];
 
-void speakCommand(const std::vector<std::string>& parameters) {
-    std::cout << "You commanded me to speak." << std::endl;
-    // Access and use the parameters as needed
+    // Get the Mongo URI from Replit Secrets
+    char* mySecret = getenv("MONGO_URI");
+
+    // Connect to the MongoDB Atlas database
+    mongocxx::instance instance{};
+    mongocxx::uri uri(mySecret);
+    mongocxx::client client(uri);
+
+    // Access the "commands" collection
+    mongocxx::database db = client["MUDTerm"];
+    mongocxx::collection collection = db["commands"];
+
+    // Prepare the query to find the command by name
+    bsoncxx::builder::stream::document filter_builder{};
+    filter_builder << "name" << commandName;
+    bsoncxx::document::value filter_value = filter_builder.view();
+
+    // Find the command document in the collection
+    bsoncxx::stdx::optional<bsoncxx::document::value> result = collection.find_one(filter_value);
+    if (result) {
+        bsoncxx::document::view document_view = result.value().view();
+        std::string execValue = document_view["exec"].get_utf8().value.to_string();
+        std::cout << execValue << std::endl;
+    } else {
+        std::cout << "Command not found." << std::endl;
+    }
 }
 
 int main() {
     std::unordered_map<std::string, std::function<void(const std::vector<std::string>&)>> commandMap;
-    commandMap["run"] = runCommand;
-    commandMap["walk"] = walkCommand;
-    commandMap["speak"] = speakCommand;
+    commandMap["execute"] = executeCommand;
 
     std::string input;
 
@@ -48,15 +66,18 @@ int main() {
             // Extract the command
             std::string command = tokens[0];
 
-            // Extract the parameters (if any)
+            // Check if the command is "exit"
+            if (command == "exit") {
+                break;
+            }
+
+            // Extract the parameters (excluding the command)
             std::vector<std::string> parameters(tokens.begin() + 1, tokens.end());
 
             // Find the command in the map and call the associated function
             auto it = commandMap.find(command);
             if (it != commandMap.end()) {
                 it->second(parameters);  // Call the function with parameters
-            } else if (command == "exit") {
-                break;
             } else {
                 std::cout << "Invalid command. Try again." << std::endl;
             }
