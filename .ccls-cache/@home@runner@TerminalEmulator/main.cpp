@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <functional>
 #include <stdlib.h>
-#include <nlohmann/json.hpp>
+#include "json.hpp"
 #include <mongocxx/client.hpp>
 #include <mongocxx/instance.hpp>
 
